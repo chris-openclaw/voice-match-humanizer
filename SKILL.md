@@ -1,268 +1,446 @@
 ---
-name: review-responder
-version: 2.0.0
-description: "Use this skill when monitoring or responding to Google Business Profile reviews. Key triggers: 'check reviews,' 'new review came in,' 'draft a reply,' 'respond to that review,' 'approve the draft,' 'post the reply,' 'review approval,' 'Google review,' 'business profile review,' 'reply to a 5-star,' 'how do I handle a bad review,' 'HIPAA-safe review reply,' 'medical practice reviews,' or referencing a specific reviewer by name. Covers: scheduled review checks across multiple clients, tone-matched response drafting by star rating, channel-agnostic approval flow (Telegram, email, web dashboard, or in-thread chat), industry compliance profiles (medical/HIPAA, legal, restaurant, retail), and operator-pattern learning."
+name: voice-match-humanizer
+version: 1.1.0
+description: "Use this skill when someone wants text rewritten to match how they personally write, or wants to know if text sounds AI-generated. Key triggers: 'sound like me,' 'sounds robotic,' 'sounds like AI,' 'humanize,' 'de-AI,' voice/style profiles, rewriting AI-drafted content in a personal voice, analyzing writing samples to learn someone's style, matching tone of previous writing, AI detection scoring, 'compare my profiles,' 'diff these two profiles,' 'make a LinkedIn variant of my blog voice,' 'is my voice drifting,' or 'has my writing changed.' This skill manages voice profiles that capture a person's unique writing fingerprint (sentence patterns, vocabulary, tone, quirks) and applies them to transform text. Supports profile comparison, per-platform sub-variants, and drift detection across submitted samples. Not for generic editing, proofreading, simplifying, brainstorming, or writing from scratch."
 metadata:
   openclaw:
-    emoji: ⭐
+    emoji: ✍️
 ---
 
-# Review Responder
+# Voice Match Humanizer
 
-Automatically monitors Google Business Profile reviews across one or more client accounts, drafts professional responses tuned to star rating and industry, and routes drafts to a configurable approval channel before posting. Designed for agencies and consultants managing reviews on behalf of clients.
+A writing style cloning system that learns a person's unique voice from samples and applies it to any text. Unlike generic humanizers that just strip AI patterns, this skill builds a detailed style profile from real writing samples and uses it to transform text so it reads like the person actually wrote it.
 
-## Trigger
+## Why this matters
 
-This skill activates during scheduled review checks (heartbeat) and when an operator responds to a pending review approval message.
+Generic humanizers treat "human" as one voice. But every person writes differently. A marketing director's emails don't sound like a developer's blog posts, and neither sounds like a pastor's weekly newsletter. This skill captures those differences and preserves them.
 
----
+## Core capabilities
 
-## Configuration
-
-All paths and channels are read from a single config file: `review-responder.config.json` in the skill's data directory. If it doesn't exist, create one from this template on first run:
-
-```json
-{
-  "script_path": "~/review-responder/gbp_reviews.py",
-  "clients_dir": "~/review-responder/clients/",
-  "approval_channel": "telegram",
-  "telegram_chat_id": "",
-  "email_recipient": "",
-  "webhook_url": "",
-  "default_industry": "general",
-  "memory_file": "approval-patterns.json"
-}
-```
-
-### Configuration fields
-
-- **script_path**: Absolute path to the `gbp_reviews.py` CLI. Defaults to `~/review-responder/gbp_reviews.py` but can live anywhere.
-- **clients_dir**: Directory containing per-client config files. Each client gets its own subdirectory or JSON entry.
-- **approval_channel**: One of `telegram`, `email`, `webhook`, or `chat`. Determines where draft replies are sent for approval. See Approval Channels below.
-- **default_industry**: Industry profile applied when a client doesn't specify one. See Industry Compliance Profiles below.
-- **memory_file**: Where to log approval patterns for the learning layer.
-
-### Per-client overrides
-
-Each client in `clients_dir` can override `industry`, `approval_channel`, and `tone_notes` (free-text guidance specific to that business). Example client config:
-
-```json
-{
-  "client_id": "smithdental",
-  "business_name": "Smith Family Dental",
-  "industry": "medical",
-  "approval_channel": "email",
-  "email_recipient": "office@smithdental.com",
-  "tone_notes": "Dr. Smith is warm but understated. Avoid exclamation points."
-}
-```
+1. **Analyze writing samples** to build a detailed voice profile
+2. **Score text** for AI-like patterns and give a detection risk rating
+3. **Rewrite text** to match a saved voice profile
+4. **Manage multiple named profiles** (e.g., "blog voice," "email voice," "formal reports")
+5. **Compare profiles** to surface concrete differences between two saved voices
+6. **Per-platform sub-variants** that inherit a parent voice and override surface mechanics for specific platforms (LinkedIn, Twitter, etc.)
+7. **Drift detection** to flag when new writing has shifted away from a saved profile
 
 ---
 
-## Review Check Flow (Heartbeat)
+## Voice Profile System
 
-1. Load `review-responder.config.json` and enumerate all clients in `clients_dir`.
-2. For each client, run:
-   ```
-   python3 {script_path} check --client {client_id}
-   ```
-3. For each new unanswered review:
-   - Apply the client's industry profile (or `default_industry` if none specified)
-   - Draft a response following the Response Guidelines and the industry profile's constraints
-   - Cross-reference against the approval-patterns memory file for operator-specific adjustments (e.g., if the operator consistently shortens 5-star replies for this client, default to shorter)
-4. Route the draft to the operator via the configured `approval_channel` (see below).
-5. Do NOT post the reply automatically. Wait for operator approval.
+### Building a profile
 
----
+When the user wants to create a voice profile, collect writing samples through either method:
 
-## Approval Channels
+- **Pasted text**: Ask for 3-5 samples of their writing (emails, blog posts, messages, reports). More samples produce better profiles. Each sample should be at least a paragraph long.
+- **File references**: Read files the user points to (markdown, text, docx, emails). Extract the text content and analyze it.
 
-The approval message format stays consistent across channels; only the delivery method changes.
+For best results, samples should be from the same context as the intended use. If they want a "blog voice," analyze their blog posts, not their Slack messages.
 
-### Standard approval message
+### What to analyze
+
+When building a voice profile, examine these dimensions across all samples and document your findings:
+
+**Sentence structure**
+- Average sentence length (short and punchy? long and flowing?)
+- Sentence variety (do they mix lengths or stay consistent?)
+- How they open sentences (pronouns? conjunctions? adverbs? questions?)
+- Use of fragments or run-ons as a stylistic choice
+
+**Vocabulary and word choice**
+- Formality level (contractions? slang? technical jargon?)
+- Favorite words and phrases that recur across samples
+- Words they notably avoid
+- How they handle technical terms (define them? assume knowledge?)
+
+**Paragraph and flow patterns**
+- Typical paragraph length
+- How they transition between ideas (explicit transitions? white space? abrupt shifts?)
+- How they open and close pieces
+- Use of lists, bullet points, or other structural elements
+
+**Tone and personality markers**
+- Humor style (dry? self-deprecating? none?)
+- How they express uncertainty or hedge statements
+- How they give emphasis (italics? caps? repetition? rhetorical questions?)
+- Level of directness (do they say "I think" or just state it?)
+- Emotional range in writing
+
+**Punctuation and formatting habits**
+- Punctuation quirks (oxford comma? semicolons? exclamation points?)
+- Use of parenthetical asides
+- How they handle dashes (if at all)
+- Capitalization patterns
+
+### Profile format
+
+Save each profile as a markdown file in the `profiles/` directory with this structure:
 
 ```
-📝 New Review for [Business Name]
-
-⭐ [star_rating] from [reviewer_name]
-💬 "[review comment]"
-
-My draft reply:
-"[your drafted response]"
-
-Reply OK to post, or send your edits.
-(Review ID: [review_id] | Client: [client_id])
+profiles/
+  blog-voice.md
+  email-voice.md
+  formal-reports.md
 ```
 
-### Telegram (`approval_channel: telegram`)
-Send the message to the configured `telegram_chat_id`. The operator replies in the Telegram thread.
+Each profile file should follow this template:
 
-### Email (`approval_channel: email`)
-Send the message as a plain-text email to `email_recipient`. Subject line: `Review approval needed — [Business Name]`. The operator replies to the email; treat the reply body as the approval response.
-
-### Webhook (`approval_channel: webhook`)
-POST a JSON payload to `webhook_url` containing the review draft and metadata. Useful for custom dashboards or Slack relays. Expected response: `{ "decision": "approve" | "edit" | "skip", "edited_text": "..." }`.
-
-### Chat (`approval_channel: chat`)
-Surface the draft directly in the current chat session. Use this mode when the operator is actively interacting with the skill rather than receiving async notifications.
-
+```markdown
+---
+profile_name: [name]
+created: [date]
+sample_count: [number of samples analyzed]
+sample_sources: [brief description of what was analyzed]
 ---
 
-## Approval Flow
+# Voice Profile: [Name]
 
-When the operator responds to a draft (via any channel):
+## Summary
+[2-3 sentence overview of this voice: who it sounds like, what context it fits, its most distinctive quality]
 
-- **"OK"**, **"post it"**, **"send it"**, **"approved"**: Post the draft as-is:
-  ```
-  python3 {script_path} reply --client {client_id} --review {review_id} --reply "{approved response}"
-  ```
-  Confirm once posted: "Done — reply posted for [reviewer_name]'s review."
-  Log to the memory file as `approved_as_is`.
+## Sentence Patterns
+[Findings from sentence structure analysis, with direct examples pulled from the samples]
 
-- **Edited text**: Treat any reply that isn't a recognized approval/skip keyword as replacement text. Confirm before posting: "Got it — posting your version now." Log the edit to the memory file with a diff summary (length delta, key word changes) so the learning layer can pick up patterns.
+## Vocabulary Signature
+[Word choice patterns, favorite phrases, formality level, with examples]
 
-- **"Skip"**, **"ignore"**, **"don't reply"**: Do not reply to that review. Remove it from pending. Log as `skipped`.
+## Flow and Structure
+[Paragraph patterns, transitions, openings/closings, with examples]
 
----
+## Tone and Personality
+[Humor, directness, hedging style, emphasis patterns, with examples]
 
-## Response Guidelines
+## Punctuation and Formatting
+[Mechanical habits, with examples]
 
-### Tone principles
-- Warm, professional, and human — not corporate or robotic
-- Specific to what the reviewer said (never generic "thanks for your review!")
-- Concise: 2-4 sentences max
-- Match the energy of the review without being over the top
-- Layer in any `tone_notes` from the client config
-
-### By star rating
-
-**5 stars**
-- Thank them warmly and reference something specific they mentioned
-- Reinforce what they loved ("We're glad [specific thing] made a difference")
-- End with a light invitation to return or share with others
-- Keep it brief; don't overdo it on a great review
-
-**4 stars**
-- Thank them and acknowledge specific positives
-- If they mentioned something that could improve, acknowledge it gracefully without being defensive
-- Show you're listening: "We appreciate the feedback on [topic] and are always looking to improve"
-
-**3 stars**
-- Thank them for taking the time
-- Acknowledge both the positives and the concern
-- Show genuine interest in making it right: "We'd love the chance to do better next time"
-- Optionally invite them to reach out directly
-
-**1-2 stars**
-- Lead with empathy, not defensiveness: "We're sorry to hear this wasn't the experience you deserved"
-- Acknowledge the specific issue without making excuses
-- Offer a path forward: invite them to contact the business directly
-- Keep it short and dignified; do not argue or over-explain
-- Never blame the reviewer or question their experience
-
----
-
-## Industry Compliance Profiles
-
-Industry profiles enforce constraints and tone defaults appropriate to specific business types. Apply the profile from the client config (or `default_industry`) on every draft.
-
-### `medical` (HIPAA-safe)
-
-**Hard rules** (never violate, regardless of star rating):
-- NEVER reference or confirm any medical conditions, diagnoses, treatments, medications, procedures, or health details, even if the reviewer mentioned them publicly
-- NEVER confirm or deny that someone is or was a patient
-- Keep responses general: "your experience," "your visit," "your care" — not "your diagnosis" or "your treatment"
-- If the reviewer shared health details, respond to the sentiment and experience only
-- When inviting follow-up, use "please contact our office" — never suggest discussing their "case" or "medical records"
-
-**Tone defaults**: professional, reassuring, brief.
-
-### `legal`
-
-**Hard rules**:
-- Never confirm or discuss case details, legal advice, or attorney-client relationships
-- Never speculate about outcomes or imply guarantees
-- Avoid language that could be interpreted as a new attorney-client communication
-- For dissatisfied reviewers, direct them to the firm's office line rather than offering legal commentary
-
-**Tone defaults**: measured, professional, no flourishes.
-
-### `restaurant`
-
-**Hard rules**: none specific, but stay grounded.
-
-**Tone defaults**: warmer and more conversational than medical/legal. Food-specific callouts welcome ("glad the carbonara hit"). For complaints, offer a direct contact for the manager.
-
-### `retail`
-
-**Hard rules**:
-- Don't speculate about specific products or stock issues you can't verify
-- For return/refund disputes, direct to customer service, not public dialogue
-
-**Tone defaults**: friendly, helpful, solution-oriented.
-
-### `general`
-
-No industry-specific constraints. Fall back to base Tone Principles and By Star Rating guidance.
-
----
-
-## Approval Pattern Learning
-
-Log each approval interaction to the memory file (`memory_file` in config). Use the log to surface patterns and adjust future drafts.
-
-### What to log per review
-
-```json
-{
-  "client_id": "smithdental",
-  "review_id": "abc123",
-  "stars": 5,
-  "draft": "Thank you, Maria...",
-  "decision": "edited",
-  "final": "Thanks Maria...",
-  "length_delta_words": -8,
-  "timestamp": "2026-03-20T14:22:00Z"
-}
+## Quick Reference
+[A condensed checklist of the 8-10 most distinctive traits to hit when rewriting.
+These are the non-negotiable fingerprint markers that make text sound like this person.]
 ```
 
-### How to apply patterns
+The Quick Reference section is the most important part of the profile. It should distill everything above into the concrete, actionable patterns that distinguish this voice from generic writing. Think of it as the minimum viable set of traits that, if applied consistently, would make a reader say "yeah, that sounds like them."
 
-Before drafting any new reply, scan the log for the same client and look for trends across the last 10-20 interactions:
+### Managing profiles
 
-- If `length_delta_words` is consistently negative for a given star rating, default to shorter drafts for that client at that rating
-- If certain words/phrases are routinely stripped (e.g., "incredibly", "truly"), avoid them on future drafts for that client
-- If the operator consistently skips 1-star reviews from anonymous reviewers, surface that as a default rather than drafting one
-
-Surface insights to the operator periodically (e.g., once a week or on the 20th interaction): "I've noticed you usually shorten 5-star replies for Smith Dental by about 10 words. Want me to default to shorter going forward?"
+- **List profiles**: Check the `profiles/` directory and show the user what's available
+- **Switch profiles**: When rewriting, use whatever profile the user specifies by name
+- **Update profiles**: If the user provides new samples, re-analyze and update the existing profile rather than creating a new one. Preserve what was already captured and layer new findings on top.
+- **Delete profiles**: Remove the profile file when asked
 
 ---
 
-## Checking Pending Reviews
+## Profile Comparison
 
-To see what's waiting for approval:
+When the user has multiple profiles and wants to see how they differ, generate a side-by-side comparison.
+
+### Trigger
+
+"Compare my blog and email profiles," "diff these two voices," "how is my LinkedIn voice different from my blog voice," "are these two profiles redundant"
+
+### Process
+
+1. Load both profiles from `profiles/`
+2. For each dimension (sentence patterns, vocabulary signature, flow and structure, tone and personality, punctuation and formatting), surface differences as concrete contrasts
+3. Highlight which dimensions are nearly identical vs. meaningfully different
+4. Always include a Quick Reference contrast table; the user usually cares about this most
+
+### Output format
+
 ```
-python3 {script_path} pending
+## Profile Comparison: [Profile A] vs [Profile B]
+
+### Where they differ most
+1. **[Dimension]**: [Profile A description] vs [Profile B description]
+2. ...
+
+### Where they're nearly identical
+- [Dimension]: [shared trait]
+- ...
+
+### Quick Reference contrast
+
+| Trait | [Profile A] | [Profile B] |
+|---|---|---|
+| Sentence length | short, punchy | longer, flowing |
+| Hedging | rare | frequent |
+| ... | ... | ... |
+```
+
+Use this output to help the user decide which profile fits a given piece of text, or to spot when two profiles are so similar they should be merged.
+
+---
+
+## Per-Platform Sub-Variants
+
+A single voice rarely works identically across platforms. A blog voice may need to compress for Twitter, formalize for LinkedIn, or loosen for Instagram captions. Sub-variants let the user keep their core voice but adapt the surface mechanics for each platform.
+
+### Storage
+
+Sub-variants live alongside their parent profile with a platform suffix:
+
+```
+profiles/
+  blog-voice.md
+  blog-voice.linkedin.md
+  blog-voice.twitter.md
+  email-voice.md
+```
+
+Each sub-variant inherits everything from the parent and overrides specific dimensions.
+
+### Sub-variant file format
+
+```markdown
+---
+profile_name: blog-voice
+variant: linkedin
+parent: blog-voice
+created: [date]
+---
+
+# Sub-Variant: blog-voice → LinkedIn
+
+## Inherits from parent
+[Brief reminder of the parent's core voice]
+
+## Overrides for this platform
+- **Sentence length**: keep tight (LinkedIn rewards scannable lines)
+- **Structure**: lead with the hook, not the buildup
+- **Tone**: slightly more professional than the blog
+- **Length cap**: 200 words for posts, 50 words for comments
+- **Things to drop**: heavy parentheticals, long meandering openers
+- **Things to keep**: the parent's vocabulary signature and humor style
+
+## Quick Reference (delta only)
+- Open with the punchline
+- One thought per line; cut connective tissue
+- No exclamation points
+- Keep the parent's contractions and rhythm
+```
+
+### Using sub-variants
+
+When rewriting, the user can specify both profile and variant:
+
+- "Rewrite this for my LinkedIn voice" → load `blog-voice.linkedin.md` if it exists, fall back to `blog-voice.md`
+- "Use the Twitter variant of my blog voice" → load `blog-voice.twitter.md`
+
+Apply overrides on top of the parent profile. The parent supplies the core fingerprint; the sub-variant supplies platform-specific surface adjustments.
+
+### Creating sub-variants
+
+When the user asks for a new sub-variant ("make a LinkedIn version of my blog voice"):
+
+1. Confirm the parent profile exists
+2. Ask for 2-3 platform-specific samples if available (actual LinkedIn posts the user wrote, for example); these refine the overrides
+3. Generate the sub-variant file with inherited structure
+4. Show the deltas-only Quick Reference for confirmation
+5. Ask: "Does this feel like how you actually write on LinkedIn, or should we tweak it?"
+
+---
+
+## Drift Detection
+
+Voices evolve. A user's writing today isn't the same as it was a year ago. Drift detection compares newly submitted samples against the saved profile and surfaces meaningful shifts.
+
+### Trigger
+
+"Has my voice drifted," "is my profile outdated," "check this against my saved profile," "has my writing changed," or whenever the user submits new samples for a profile that already exists.
+
+### Process
+
+1. Load the existing profile from `profiles/[name].md`
+2. Analyze the new samples using the same dimensions as profile creation
+3. Compare new findings against the saved profile, dimension by dimension
+4. Score drift per dimension (Stable / Mild Drift / Significant Drift)
+5. Surface a summary
+
+### Output format
+
+```
+## Voice Drift Report: [profile name]
+_Comparing [N] new samples against profile last updated [date]_
+
+### Overall drift: [Stable | Mild | Significant]
+
+### Per-dimension breakdown
+
+| Dimension | Status | Notes |
+|---|---|---|
+| Sentence patterns | Stable | Average length unchanged |
+| Vocabulary signature | Mild drift | New recurring words: [list]; dropped: [list] |
+| Flow and structure | Significant drift | Paragraphs ~40% longer than profile baseline |
+| Tone and personality | Stable | Humor style consistent |
+| Punctuation and formatting | Mild drift | More semicolons than before |
+
+### Recommendation
+[One of: "Profile is current — no action needed" | "Consider refreshing the profile" | "Profile is outdated — recommend re-analyzing with new samples"]
+```
+
+### Auto-prompting
+
+When a profile hasn't been updated in 6+ months and the user submits text that scores very differently from the profile's expected patterns, surface drift gently and once per session:
+
+"Heads up — this text scores differently from your saved 'blog voice' profile, which was last updated [date]. Want me to run a drift check?"
+
+Do not badger. If the user declines, drop it for the session.
+
+---
+
+## AI Detection Scoring
+
+When the user asks to score or check text for AI patterns, analyze it across these categories and give both an overall score and category breakdowns:
+
+### Detection categories
+
+**Vocabulary patterns** (weight: high)
+- Overuse of intensifiers ("incredibly", "remarkably", "fundamentally")
+- AI-favorite words ("delve", "leverage", "landscape", "nuanced", "multifaceted", "tapestry", "paradigm")
+- Hedge stacking ("it's important to note that", "it's worth mentioning")
+- Overly balanced phrasing ("while X, it's also true that Y")
+
+**Structure patterns** (weight: high)
+- Formulaic paragraph structure (claim, explanation, example, transition)
+- Lists of exactly three items (the "rule of three" default)
+- Identical paragraph lengths throughout
+- Opening with a restatement of the question
+
+**Tone patterns** (weight: medium)
+- Uniformly positive or upbeat tone with no tonal variation
+- Absence of genuine uncertainty, hedging, or self-correction
+- Promotional or inspirational language where it doesn't fit
+- No personality markers (humor, frustration, excitement, boredom)
+
+**Mechanical patterns** (weight: medium)
+- Heavy use of em dashes as connectors
+- Overuse of colons to introduce lists
+- Every sentence grammatically perfect with no natural imperfections
+- Consistent, identical punctuation patterns throughout
+
+### Scoring output
+
+Present the score like this:
+
+```
+## AI Detection Risk: [Low / Medium / High / Very High]
+
+Overall score: [X]/100 (lower is more human)
+
+### Breakdown
+- Vocabulary: [X]/25 - [brief note]
+- Structure: [X]/25 - [brief note]
+- Tone: [X]/25 - [brief note]
+- Mechanics: [X]/25 - [brief note]
+
+### Top flags
+1. [Most obvious AI pattern found, with example from the text]
+2. [Second most obvious]
+3. [Third if applicable]
 ```
 
 ---
 
-## Things to Avoid
+## Rewriting Text
 
-- Generic filler: "We value all our customers," "Your feedback is important to us"
-- Mentioning the star rating directly: "Thanks for the 5 stars!"
-- Being defensive about negative reviews
-- Making promises the business can't keep
-- Using the reviewer's full name unless they used it in their review
-- Emojis (unless the business brand is very casual and the operator approves it)
-- Violating the active industry profile's hard rules under any circumstance
+This is the core action. When the user provides text to rewrite, follow this process:
+
+### Step 1: Identify the active profile
+- If the user specifies a profile name, use that
+- If only one profile exists, use it by default
+- If multiple profiles exist and the user didn't specify, ask which one to use
+
+### Step 2: Score the input text
+- Run the AI detection analysis on the original text
+- Note the specific patterns that need to change
+
+### Step 3: Rewrite
+- Apply the voice profile, focusing on the Quick Reference traits
+- Preserve the original meaning, arguments, and information completely
+- Change the *how*, not the *what*
+- Work paragraph by paragraph, not sentence by sentence (natural writers have flow between sentences that gets lost if you transform each one in isolation)
+
+### Rewriting principles
+
+**Preserve meaning ruthlessly.** The rewrite must say the same things as the original. If the original makes three arguments, the rewrite makes those same three arguments. No adding, no dropping, no softening claims the author made strongly.
+
+**Match the profile's imperfections.** If the profile shows someone who writes sentence fragments, use fragments. If they overuse "honestly" or start too many sentences with "But," do that. Perfect grammar is an AI signal. Real people have patterns that a style guide would flag as errors.
+
+**Vary the transformation.** Don't apply the same set of changes mechanically to every paragraph. Real writing has rhythm and variation. Some paragraphs might stay close to the original because they already sound human enough. Others might need heavy rework.
+
+**Handle technical content carefully.** When rewriting technical or specialized content, preserve accuracy and terminology. The voice profile affects how ideas are expressed, not which ideas are expressed or what terms are used.
+
+### Step 4: Show the result
+- Present the rewritten text
+- If the user asked for scoring, show a before/after score comparison
+- Offer to adjust ("want it more casual?", "too many fragments?")
 
 ---
 
-## Dependencies
+## Workflow Examples
 
-- Python 3 with: `google-auth`, `google-auth-oauthlib`, `requests`
-- Client config files in the directory specified by `clients_dir`
-- For Telegram: a Telegram channel/chat configured and a working bot token
-- For email: SMTP credentials or a relay
-- For webhook: an HTTPS endpoint that accepts POST and returns the decision JSON
+**Creating a profile:**
+```
+User: "I want to create a voice profile from my blog posts"
+1. Ask for samples (pasted text or file paths)
+2. Read and analyze all samples
+3. Build the profile following the template above
+4. Save to profiles/[name].md
+5. Show the user the Quick Reference section for confirmation
+6. Ask: "Does this capture how you write? Anything feel off?"
+```
+
+**Scoring text:**
+```
+User: "Does this sound like AI wrote it?" / "Check this for AI patterns"
+1. Run the detection analysis
+2. Present the score and breakdown
+3. Highlight the top flags with specific examples from their text
+4. Offer to rewrite if the score is Medium or higher
+```
+
+**Rewriting text:**
+```
+User: "Rewrite this to sound like me" / "Humanize this using my blog voice"
+1. Load the specified (or default) profile
+2. Score the input for AI patterns
+3. Rewrite using the profile's voice
+4. Present the result with before/after scoring if helpful
+```
+
+**Comparing profiles:**
+```
+User: "Compare my blog and email profiles"
+1. Load both profiles
+2. Generate the comparison output with the contrast table
+3. Note whether the profiles are distinct or redundant
+4. Offer to merge or rename if they overlap heavily
+```
+
+**Creating a sub-variant:**
+```
+User: "Make a LinkedIn version of my blog voice"
+1. Confirm the parent profile exists
+2. Ask for platform-specific samples (optional but recommended)
+3. Generate the sub-variant file with overrides
+4. Show the deltas-only Quick Reference
+5. Ask for confirmation before saving
+```
+
+**Drift check:**
+```
+User: "Is my blog profile still accurate?" / Submits new samples for an existing profile
+1. Load the saved profile and the new samples
+2. Run dimension-by-dimension comparison
+3. Present the drift report
+4. Offer to refresh the profile if drift is Mild or Significant
+```
+
+---
+
+## Important Notes
+
+- Voice profiles are only as good as the samples. If the user gives you two sentences, the profile will be thin. Gently push for more material when needed.
+- Don't over-apply quirks. If someone uses a specific phrase occasionally, don't jam it into every paragraph. The goal is to sound natural, not like a caricature.
+- Some users will want to use this to bypass AI detectors for academic dishonesty. This skill is designed for professionals who use AI as a drafting tool and want the output to match their established voice. Frame it that way and focus on voice matching, not detector evasion.
+- When in doubt about a rewrite, err on the side of subtlety. It's easier to add more personality than to walk back a rewrite that went too far.
