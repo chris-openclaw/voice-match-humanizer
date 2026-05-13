@@ -1,6 +1,6 @@
 ---
 name: voice-match-humanizer
-version: 1.1.0
+version: "1.1.0"
 description: "Use this skill when someone wants text rewritten to match how they personally write, or wants to know if text sounds AI-generated. Key triggers: 'sound like me,' 'sounds robotic,' 'sounds like AI,' 'humanize,' 'de-AI,' voice/style profiles, rewriting AI-drafted content in a personal voice, analyzing writing samples to learn someone's style, matching tone of previous writing, AI detection scoring, 'compare my profiles,' 'diff these two profiles,' 'make a LinkedIn variant of my blog voice,' 'is my voice drifting,' or 'has my writing changed.' This skill manages voice profiles that capture a person's unique writing fingerprint (sentence patterns, vocabulary, tone, quirks) and applies them to transform text. Supports profile comparison, per-platform sub-variants, and drift detection across submitted samples. Not for generic editing, proofreading, simplifying, brainstorming, or writing from scratch."
 metadata:
   openclaw:
