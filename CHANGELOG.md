@@ -4,6 +4,17 @@ All notable changes to this skill will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this skill adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-06-08
+
+### Added
+- **Privacy and Data Handling** section in SKILL.md describing local-only sample reads, profile writes to `profiles/` directory, sample-confidentiality posture, and no external transmission
+- Explicit **refusal scope** for detector-evasion use cases (academic dishonesty, fooling classroom AI checkers); intended use clarified as personal-voice matching for users who draft with AI
+- **Permissions and Privacy** section in README.md so users see scope, sample-handling posture, and intended-use boundary before installing
+
+### Changed
+- Narrowed the activation triggers in the `description` frontmatter to require an explicit profile-context request (named profile, sample-analysis path, comparison, sub-variant, drift, scoring), with a "do NOT trigger" guardrail for detector-evasion requests, generic editing/proofreading, and writing-from-scratch
+- Unquoted the `version` field in frontmatter (matches updated ClawHub CLI semver requirements)
+
 ## [1.1.0] — 2026-05-12
 
 ### Added

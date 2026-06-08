@@ -1,7 +1,7 @@
 ---
 name: voice-match-humanizer
-version: "1.1.0"
-description: "Use this skill when someone wants text rewritten to match how they personally write, or wants to know if text sounds AI-generated. Key triggers: 'sound like me,' 'sounds robotic,' 'sounds like AI,' 'humanize,' 'de-AI,' voice/style profiles, rewriting AI-drafted content in a personal voice, analyzing writing samples to learn someone's style, matching tone of previous writing, AI detection scoring, 'compare my profiles,' 'diff these two profiles,' 'make a LinkedIn variant of my blog voice,' 'is my voice drifting,' or 'has my writing changed.' This skill manages voice profiles that capture a person's unique writing fingerprint (sentence patterns, vocabulary, tone, quirks) and applies them to transform text. Supports profile comparison, per-platform sub-variants, and drift detection across submitted samples. Not for generic editing, proofreading, simplifying, brainstorming, or writing from scratch."
+version: 1.1.1
+description: "Use this skill when a user is actively managing voice profiles or asking for a rewrite tied to a specific saved profile. Specific triggers: 'rewrite this in my [profile-name] voice,' 'sound like me using my [profile-name] profile,' 'build a voice profile from these samples,' 'analyze my writing samples in [path/folder],' 'score this text for AI patterns,' 'compare my [profile A] and [profile B] profiles,' 'diff these two profiles,' 'make a [platform] variant of my [profile-name],' 'has my voice drifted from my [profile-name] profile,' 'check this against my saved profile,' 'list my voice profiles,' or 'update my [profile-name] profile with new samples.' Do NOT trigger on: requests to bypass AI-detection tools for academic dishonesty, generic editing/proofreading/simplifying/brainstorming, writing from scratch with no profile context, or casual mentions of voice or tone outside an active profile workflow. The skill builds and applies voice profiles that capture a person's writing fingerprint (sentence patterns, vocabulary, tone, quirks); supports profile comparison, per-platform sub-variants, drift detection, and AI-pattern scoring; stores profiles as local markdown files."
 metadata:
   openclaw:
     emoji: ✍️
@@ -438,9 +438,31 @@ User: "Is my blog profile still accurate?" / Submits new samples for an existing
 
 ---
 
+## Privacy and Data Handling
+
+This skill directs the assistant to read writing samples the user points to and to read/write voice profile files in a local `profiles/` directory in the user's working directory. It does not instruct the assistant to use email tools, browser automation, web search, or any third-party API. The skill itself ships no executable code, runs no background processes, makes no network calls of its own, and has no telemetry.
+
+**Data scope and consent rules**
+
+- **Local storage by the skill**: voice profiles (`profiles/[name].md` and `profiles/[name].[platform].md`) are written to the user's working directory. No writes outside that directory.
+- **Sample handling**: writing samples the user pastes or points the assistant to are used only to build/update profiles in the local `profiles/` directory. They are not transmitted, embedded in URLs, posted to external services, or sent anywhere outside the user's machine.
+- **Sensitive sample content**: samples may include unpublished drafts, internal documents, or personal correspondence. The assistant should treat them as confidential to this session: do not quote large blocks verbatim into outputs intended for third parties, and do not paste sample content into web searches or external tool calls.
+- **No transmission to third parties**: the skill does not send sample content, profile content, scoring results, or any other data back to its author, ClawHub, or any third party.
+- **No telemetry**: the skill does not collect usage data, profile names, or sample content.
+
+**Intended use and refusal scope**
+
+This skill is for users who draft with AI and want output that matches their own established writing voice — a personal-style adapter, not a detector-evasion tool.
+
+- The assistant should not frame outputs as designed to defeat plagiarism detectors, classroom AI checkers, or academic-integrity systems.
+- If a user explicitly requests detector evasion for academic dishonesty (e.g., "make this look human enough to fool my school's AI checker"), the assistant should decline that framing and offer the legitimate voice-matching use instead.
+- The AI Detection Scoring feature is provided for users who want to understand and reduce AI-pattern artifacts in their own drafting workflow, not as a calibration tool for evasion.
+
+---
+
 ## Important Notes
 
 - Voice profiles are only as good as the samples. If the user gives you two sentences, the profile will be thin. Gently push for more material when needed.
 - Don't over-apply quirks. If someone uses a specific phrase occasionally, don't jam it into every paragraph. The goal is to sound natural, not like a caricature.
-- Some users will want to use this to bypass AI detectors for academic dishonesty. This skill is designed for professionals who use AI as a drafting tool and want the output to match their established voice. Frame it that way and focus on voice matching, not detector evasion.
+- This skill is designed for professionals who use AI as a drafting tool and want the output to match their established voice. Frame it that way and focus on voice matching, not detector evasion (see Privacy and Data Handling above for the refusal scope).
 - When in doubt about a rewrite, err on the side of subtlety. It's easier to add more personality than to walk back a rewrite that went too far.
